@@ -1,0 +1,102 @@
+#!/bin/bash
+
+# Default debug level
+export DEBUG_LEVEL=${DEBUG_LEVEL:-2}          
+
+# Default period to wait for gateway to be available
+export WAIT_GATEWAY_PERIOD=${WAIT_GATEWAY_PERIOD:-5}
+
+#===/ Utility functions \======================================================
+
+# Trick to no depend on locale (do not remove)
+export LC_ALL=C
+
+function logdate { date "+%Y-%m-%d %H:%M:%S"; }
+function fatal { echo "$(logdate) [FATAL] $@" >&2; exit 1; }
+function err { echo "$(logdate) [ERROR] $@" >&2; }
+function warn { [ $DEBUG_LEVEL -ge 1 ] && echo "$(logdate) [WARNING] $@" >&2; }
+function info { [ $DEBUG_LEVEL -ge 2 ] && echo "$(logdate) [INFO] $@" >&2; }
+function debug { [ $DEBUG_LEVEL -ge 3 ] && echo "$(logdate) [DEBUG] $@" >&2; }
+function now { date +%s; }
+
+#===/ Detection \==============================================================
+
+# Detect the network configuration
+info "Detecting default interface"
+DEFAULT_INTERFACE=$(ip route show default | awk '/default/ {print $5}')
+
+info "Detecting private IP address of the pod"
+LOCAL_PRIVATE_IP=$(ip addr show $DEFAULT_INTERFACE | grep "inet\b" | awk '{print $2}' | cut -d/ -f1)
+
+info "Detecting public IP address of the host"
+LOCAL_PUBLIC_IP=$(curl -s ifconfig.io)
+
+info "Detecting default gateway"
+ORIGINAL_GATEWAY=$(ip route show default | awk '/default/ {print $3}')
+
+info "Summary of detected network configuration"
+info "  Default interface: $DEFAULT_INTERFACE"
+info "  Local private IP: $LOCAL_PRIVATE_IP"
+info "  Local public IP: $LOCAL_PUBLIC_IP"
+info "  Original gateway: $ORIGINAL_GATEWAY"
+
+#===/ Init \===================================================================
+
+info "Backup original routing table"
+ip r > /var/lib/transplaneur/original-routes
+
+#===/ Signal handling \========================================================
+
+# Trap handler to restore original routing table
+function trapHandlerRestore { 
+    info "Signal $1 detected, exiting"
+    exit
+}
+
+# Catching Signals
+info "Catching signals to restore original routing table"
+for i in SIGTERM SIGINT SIGKILL SIGQUIT SIGSTOP SIGABRT; do
+    trap "trapHandlerRestore $i" $i
+done
+
+
+#===/ Routing \================================================================
+
+function changeGateway {
+    # Retrieve the gateway IP address
+    GATEWAY_IP=$1
+
+    info "Changing default gateway to $GATEWAY_IP"
+
+    # Replace the old gateway by the new one
+    ip r del default
+    ip r add default via $GATEWAY_IP
+
+    # Flush the ARP cache
+    ip n flush all
+}
+
+CURRENT_GATEWAY=""
+
+# Watch for changes in the gateway
+while true; do
+
+    # Wait for the gateway to be available
+    while [ ! -r /var/run/transplaneur/local-gateway ]; do
+        warn "Waiting for gateway to be available ..."
+        sleep ${WAIT_GATEWAY_PERIOD}
+    done
+
+    # If the gateway has changed, update the routing table
+    debug "Check if gateway has changed from current : $CURRENT_GATEWAY"
+    if [ "$CURRENT_GATEWAY" != "$(cat /var/run/transplaneur/local-gateway)" ]; then
+        PREVIOUS_GATEWAY=$CURRENT_GATEWAY
+        CURRENT_GATEWAY=$(cat /var/run/transplaneur/local-gateway)
+        info "Gateway changed from $PREVIOUS_GATEWAY to $CURRENT_GATEWAY"
+        changeGateway $CURRENT_GATEWAY
+    fi
+
+    sleep 1
+done 
+
+info "Stop required, exiting"

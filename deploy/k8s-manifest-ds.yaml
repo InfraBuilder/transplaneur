@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: transplaneur-gateway
+  labels:
+    app: transplaneur-gateway
+spec:
+  selector:
+    matchLabels:
+      app: transplaneur-gateway
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app: transplaneur-gateway
+    spec:
+      containers:
+      - name: transplaneur-gateway
+        image: infrabuilder/transplaneur:edge
+        imagePullPolicy: Always
+        command: 
+        - transplaneur-gateway
+        resources: {}
+          # limits:
+          #   cpu: 50m
+          #   memory: 64Mi
+          # requests:
+          #   cpu: 50m
+          #   memory: 64Mi
+        securityContext:
+          privileged: true
+          runAsNonRoot: false
+          runAsUser: 0
+        env:
+        - name: MY_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: MY_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: MY_NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: MY_POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        readinessProbe:
+          exec:
+            command:
+            - /usr/local/bin/transplaneur-healthcheck-gw
+          initialDelaySeconds: 3
+          periodSeconds: 1
+        volumeMounts:
+        - name: run
+          mountPath: /var/run/transplaneur
+      terminationGracePeriodSeconds: 10
+      volumes:
+      - name: run
+        hostPath:
+          path: /var/run/transplaneur
+          type: DirectoryOrCreate

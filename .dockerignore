@@ -1,0 +1,8 @@
+deploy/
+.git/
+docs/
+WIP/
+**/.DS_Store
+.vscode/
+.idea/
+*.log

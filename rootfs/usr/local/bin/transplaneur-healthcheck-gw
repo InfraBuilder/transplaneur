@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VPN_ENDPOINT_FILE=/var/run/transplaneur/vpn-endpoint
+VPN_ENDPOINT_FILE=/var/run/transplaneur/vpn-endpoint-ip
 
 # Wait for the VPN endpoint to be available
 [ -r $VPN_ENDPOINT_FILE ] || exit 1

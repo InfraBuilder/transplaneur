@@ -9,8 +9,6 @@ RUN apk add --no-cache \
 
 COPY rootfs/ /
 
-ENV TRANSPLANEUR_SVC_NAME=transplaneur-hl.transplaneur.svc.cluster.local. \
-    POD_CIDR="" \
-    SERVICE_CIDR=""
+WORKDIR /var/run/transplaneur
 
 ENTRYPOINT [ "/entrypoint.sh" ]

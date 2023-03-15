@@ -2,7 +2,7 @@
 
 
 # Default period to wait for gateway to be available
-export NETWORKS_TO_ROUTE="default"
+export NETWORKS_TO_ROUTE="${NETWORKS_TO_ROUTE:-default}"
 
 # Default debug level
 export DEBUG_LEVEL=${DEBUG_LEVEL:-2}          

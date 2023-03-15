@@ -11,6 +11,7 @@ export DEBUG_LEVEL=${DEBUG_LEVEL:-2}
 export WAIT_GATEWAY_PERIOD=${WAIT_GATEWAY_PERIOD:-5}
 
 export TRANSPLANEUR_RUN_DIR=/var/run/transplaneur
+export TRANSPLANEUR_LIB_DIR=/var/lib/transplaneur
 
 #===/ Utility functions \======================================================
 
@@ -49,7 +50,7 @@ info "  Original gateway: $ORIGINAL_GATEWAY"
 #===/ Init \===================================================================
 
 info "Backup original routing table"
-ip r > ${TRANSPLANEUR_RUN_DIR}/original-routes
+ip r > ${TRANSPLANEUR_LIB_DIR}/original-routes
 
 #===/ Signal handling \========================================================
 

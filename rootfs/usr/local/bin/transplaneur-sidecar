@@ -1,10 +1,16 @@
 #!/bin/bash
 
+
+# Default period to wait for gateway to be available
+export NETWORKS_TO_ROUTE="default"
+
 # Default debug level
 export DEBUG_LEVEL=${DEBUG_LEVEL:-2}          
 
 # Default period to wait for gateway to be available
 export WAIT_GATEWAY_PERIOD=${WAIT_GATEWAY_PERIOD:-5}
+
+export TRANSPLANEUR_RUN_DIR=/var/run/transplaneur
 
 #===/ Utility functions \======================================================
 
@@ -43,7 +49,7 @@ info "  Original gateway: $ORIGINAL_GATEWAY"
 #===/ Init \===================================================================
 
 info "Backup original routing table"
-ip r > /var/lib/transplaneur/original-routes
+ip r > ${TRANSPLANEUR_RUN_DIR}/original-routes
 
 #===/ Signal handling \========================================================
 
@@ -62,41 +68,63 @@ done
 
 #===/ Routing \================================================================
 
+function ensureRouteIsSet {
+    # Retrieve the route to check
+    ROUTE=$1
+
+    # Check if the route is already set
+    if ! ip r | grep -q "$ROUTE"; then
+        info "  Adding route '$ROUTE'"
+        ip r add $ROUTE
+    fi
+}
+
 function changeGateway {
     # Retrieve the gateway IP address
     GATEWAY_IP=$1
 
-    info "Changing default gateway to $GATEWAY_IP"
+    # Create routes for pod and services CIDR
+    info "Checking routes for pod and services CIDR"
+    for i in $CLUSTER_POD_CIDR $CLUSTER_SERVICE_CIDR; do
+        ensureRouteIsSet "$i via $ORIGINAL_GATEWAY dev $DEFAULT_INTERFACE"
+    done
 
-    # Replace the old gateway by the new one
-    ip r del default
-    ip r add default via $GATEWAY_IP
+    info "Changing routes gateway to $GATEWAY_IP"
+    for i in $NETWORKS_TO_ROUTE; do
+        info "  Route $i"
+        [ "$(ip r show $i)" = "" ] || ip r del $i
+        ip r add $i via $GATEWAY_IP
+    done
 
     # Flush the ARP cache
     ip n flush all
 }
 
+# Starting with no gateway to force the first update
 CURRENT_GATEWAY=""
 
 # Watch for changes in the gateway
 while true; do
 
     # Wait for the gateway to be available
-    while [ ! -r /var/run/transplaneur/local-gateway ]; do
+    while [ ! -r ${TRANSPLANEUR_RUN_DIR}/local-gateway ]; do
         warn "Waiting for gateway to be available ..."
         sleep ${WAIT_GATEWAY_PERIOD}
     done
 
     # If the gateway has changed, update the routing table
     debug "Check if gateway has changed from current : $CURRENT_GATEWAY"
-    if [ "$CURRENT_GATEWAY" != "$(cat /var/run/transplaneur/local-gateway)" ]; then
+    if [ "$CURRENT_GATEWAY" != "$(cat ${TRANSPLANEUR_RUN_DIR}/local-gateway)" ]; then
         PREVIOUS_GATEWAY=$CURRENT_GATEWAY
-        CURRENT_GATEWAY=$(cat /var/run/transplaneur/local-gateway)
+        
+        CURRENT_GATEWAY=$(cat ${TRANSPLANEUR_RUN_DIR}/local-gateway)
+        
+        CLUSTER_POD_CIDR=$(cat ${TRANSPLANEUR_RUN_DIR}/cluster-pod-cidr)
+        CLUSTER_SERVICE_CIDR=$(cat ${TRANSPLANEUR_RUN_DIR}/cluster-svc-cidr)
+
         info "Gateway changed from $PREVIOUS_GATEWAY to $CURRENT_GATEWAY"
         changeGateway $CURRENT_GATEWAY
     fi
 
     sleep 1
 done 
-
-info "Stop required, exiting"

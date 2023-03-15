@@ -30,7 +30,7 @@ function now { date +%s; }
 info "Ensure that IP forwarding is enabled"
 sysctl -w net.ipv4.ip_forward=1 || fatal "Cannot enable IP forwarding (net.ipv4.ip_forward=1)"
 
-export FILES_TO_CLEAN="local-gateway vpn-public-ip vpn-endpoint-ip"
+export FILES_TO_CLEAN="local-gateway vpn-public-ip vpn-endpoint-ip cluster-pod-cidr cluster-svc-cidr"
 
 # Clean potential remaining files from previous run
 for i in $FILES_TO_CLEAN; do
@@ -79,6 +79,9 @@ function startVpn {
     echo $VPN_PUBLIC_IP > ${TRANSPLANEUR_RUN_DIR}/vpn-public-ip
 
     [ "$VPN_PUBLIC_IP" = "" ] && { err "Cannot detect new egress public IP, does endpoint have internet access ? please check configuration"; return 1; }
+
+    echo $CLUSTER_POD_CIDR > ${TRANSPLANEUR_RUN_DIR}/cluster-pod-cidr
+    echo $CLUSTER_SVC_CIDR > ${TRANSPLANEUR_RUN_DIR}/cluster-svc-cidr
 
     # Declare the local gateway
     info "Declare the local gateway"

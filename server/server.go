@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"encoding/json"
@@ -11,11 +11,8 @@ import (
 	"os/exec"
 	"os/signal"
 	"strconv"
-	"sync"
 	"syscall"
 	"time"
-
-	"github.com/gorilla/mux"
 
 	"github.com/vishvananda/netlink"
 
@@ -23,42 +20,9 @@ import (
 
 	wgctrl "golang.zx2c4.com/wireguard/wgctrl"
 	wgtypes "golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+
+	"github.com/gorilla/mux"
 )
-
-type IPAM struct {
-	cidr         string
-	allocatedIPs map[string]string
-	availableIPs []net.IP
-	filePath     string
-	mu           sync.Mutex
-}
-
-func (ipam *IPAM) String() string {
-	return fmt.Sprintf("IPAM(%s) : availableIPs=%d : allocatedIPs=%d", ipam.cidr, len(ipam.availableIPs), len(ipam.allocatedIPs))
-}
-
-func (ipam *IPAM) Register(publicKey string) (string, error) {
-	ipam.mu.Lock()
-	defer ipam.mu.Unlock()
-
-	if ip, ok := ipam.allocatedIPs[publicKey]; ok {
-		fmt.Println("pubkey=" + publicKey + " : IP already allocated : " + ip)
-		return ip, nil
-	}
-
-	if len(ipam.availableIPs) == 0 {
-		return "", fmt.Errorf("no IP addresses available")
-	}
-
-	ip := ipam.availableIPs[0]
-	ipam.availableIPs = ipam.availableIPs[1:]
-	ipam.allocatedIPs[publicKey] = ip.String()
-
-	data, _ := json.MarshalIndent(ipam.allocatedIPs, "", "  ")
-	ioutil.WriteFile(ipam.filePath, data, 0644)
-
-	return ip.String(), nil
-}
 
 type TransplaneurServer struct {
 	ipam         *IPAM
@@ -96,14 +60,14 @@ func NewTransplaneurServer(wgDeviceName string, privateKey string, listenPort in
 	}
 
 	cidrSubnet := ip.Mask(ipnet.Mask)
-	gatewayIp := nextIP(cidrSubnet)
+	gatewayIp := NextIP(cidrSubnet)
 
 	// 1.5) Generating the available IPs, excluding those already allocated
 	var availableIPs []net.IP
-	for ip := nextIP(gatewayIp); ipnet.Contains(ip); ip = nextIP(ip) {
-		if !ipnet.Contains(nextIP(ip)) {
+	for ip := NextIP(gatewayIp); ipnet.Contains(ip); ip = NextIP(ip) {
+		if !ipnet.Contains(NextIP(ip)) {
 			fmt.Println("IP is the broadcast address: " + ip.String())
-		} else if !allocatedIPsMap[ip.String()] && ipnet.Contains(nextIP(ip)) {
+		} else if !allocatedIPsMap[ip.String()] && ipnet.Contains(NextIP(ip)) {
 			availableIPs = append(availableIPs, ip)
 		} else {
 			fmt.Println("IP already allocated: " + ip.String())
@@ -351,60 +315,8 @@ func (ts *TransplaneurServer) natStop() error {
 	return nil
 }
 
-func nextIP(ip net.IP) net.IP {
-	i := ip.To4()
-	v := uint(i[0])<<24 + uint(i[1])<<16 + uint(i[2])<<8 + uint(i[3])
-	v += 1
-	v3 := byte(v & 0xFF)
-	v2 := byte((v >> 8) & 0xFF)
-	v1 := byte((v >> 16) & 0xFF)
-	v0 := byte((v >> 24) & 0xFF)
+func Start() {
 
-	return net.IPv4(v0, v1, v2, v3)
-}
-
-type RegisterRequest struct {
-	PublicKey string `json:"publickey"`
-}
-
-type RegisterResponse struct {
-	ClientIP         string `json:"client_ip"`
-	GatewayIP        string `json:"gateway_ip"`
-	Endpoint         string `json:"endpoint"`
-	GatewayPublicKey string `json:"gateway_public_key"`
-}
-
-func httpPostRegister(ts *TransplaneurServer, w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req RegisterRequest
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
-		return
-	}
-
-	ip, err := ts.RegisterClient(req.PublicKey)
-	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	res := RegisterResponse{
-		GatewayIP:        ts.GetGatewayIP(),
-		ClientIP:         ip,
-		Endpoint:         ts.GetEndpoint(),
-		GatewayPublicKey: ts.GetGatewayPublicKey(),
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(res)
-}
-
-func main() {
 	//====/ Configuration \=============================================
 
 	// Mandatory environment variables
@@ -517,5 +429,4 @@ func main() {
 	// Start API server
 	log.Printf("Starting server on port %s...\n", httpPort)
 	log.Fatal(http.ListenAndServe(":"+httpPort, api))
-
 }

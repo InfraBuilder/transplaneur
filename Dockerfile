@@ -1,7 +1,7 @@
 FROM golang:1.19 AS builder
 WORKDIR /app
-COPY transplaneur-server/ /app
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/transplaneur-api -v
+COPY . /app/
+RUN /app/build.sh linux
 
 
 FROM alpine:3.17
@@ -14,7 +14,7 @@ RUN apk add --no-cache \
     wireguard-tools
 
 COPY rootfs/ /
-COPY --from=builder /app/bin/transplaneur-api /usr/local/bin/transplaneur-api
+COPY --from=builder /app/bin/transplaneur_linux_amd64 /usr/local/bin/transplaneur
 
 WORKDIR /var/run/transplaneur
 

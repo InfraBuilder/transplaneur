@@ -337,14 +337,14 @@ func printUsage(subcommandFlagSet *flag.FlagSet) {
 	fmt.Printf("Usage: %s %s [flags]\n", os.Args[0], os.Args[1])
 	fmt.Println("\nMandatory flags/environment variables:")
 	subcommandFlagSet.VisitAll(func(f *flag.Flag) {
-		if f.Name == "private-key" || f.Name == "endpoint" {
+		if f.Name == "private-key" || f.Name == "endpoint" || f.Name == "bearer-token" {
 			fmt.Printf("\t-%s\n\t\t %s=<%s>\n", f.Name, f.Usage, f.Name)
 		}
 	})
 
 	fmt.Println("\nOptional flags/environment variables:")
 	subcommandFlagSet.VisitAll(func(f *flag.Flag) {
-		if f.Name != "private-key" && f.Name != "endpoint" && f.Name != "h" && f.Name != "help" {
+		if f.Name != "private-key" && f.Name != "endpoint" && f.Name != "h" && f.Name != "help" && f.Name != "bearer-token" {
 			fmt.Printf("\t-%s=%s\n\t\t%s\n", f.Name, f.DefValue, f.Usage)
 		}
 	})
@@ -362,6 +362,7 @@ func Start() {
 	// Mandatory flags/environment variables
 	privateKey := subcommandFlagSet.String("private-key", os.Getenv("WG_PRIVATE_KEY"), "WireGuard private key (WG_PRIVATE_KEY)")
 	wgServerEndpoint := subcommandFlagSet.String("endpoint", os.Getenv("WG_ENDPOINT"), "WireGuard server endpoint, ex: '<ip/hostname>:<port>' (WG_ENDPOINT)")
+	bearerToken := subcommandFlagSet.String("bearer-token", os.Getenv("BEARER_TOKEN"), "API bearer token (BEARER_TOKEN)")
 
 	// Optional flags/environment variables
 	cidr := subcommandFlagSet.String("cidr", getenvOrDefault("CIDR", "10.242.0.0/16"), "CIDR")
@@ -387,6 +388,10 @@ func Start() {
 
 	if *wgServerEndpoint == "" {
 		log.Fatal("WG_ENDPOINT is not set")
+	}
+
+	if *bearerToken == "" {
+		log.Fatal("BEARER_TOKEN is not set")
 	}
 
 	//====/ Transplaneur \==============================================
@@ -433,7 +438,7 @@ func Start() {
 	api.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			token := r.Header.Get("Authorization")
-			if token != "Bearer "+os.Getenv("BEARER_TOKEN") {
+			if token != "Bearer "+*bearerToken {
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
 			}

@@ -18,22 +18,19 @@ func main() {
 		return
 	}
 
-	versionFlag := flag.Bool("V", false, "Print version")
-	versionLongFlag := flag.Bool("version", false, "Print version")
-	helpFlag := flag.Bool("h", false, "Print help")
-	helpLongFlag := flag.Bool("help", false, "Print help")
-	verboseFlag := flag.Bool("v", false, "Enable verbose output")
-	verboseLongFlag := flag.Bool("verbose", false, "Enable verbose output")
+	globalFlagSet := flag.NewFlagSet("global", flag.ExitOnError)
 
-	flag.Parse()
+	versionFlag := globalFlagSet.Bool("V", false, "Print version")
+	versionLongFlag := globalFlagSet.Bool("version", false, "Print version")
+	helpFlag := globalFlagSet.Bool("h", false, "Print help")
+	helpLongFlag := globalFlagSet.Bool("help", false, "Print help")
+	verboseFlag := globalFlagSet.Bool("v", false, "Enable verbose output")
+	verboseLongFlag := globalFlagSet.Bool("verbose", false, "Enable verbose output")
+
+	globalFlagSet.Parse(os.Args[1:])
 
 	if *versionFlag || *versionLongFlag {
 		printVersion()
-		return
-	}
-
-	if *helpFlag || *helpLongFlag {
-		printUsage()
 		return
 	}
 
@@ -52,17 +49,24 @@ func main() {
 	case "help":
 		printUsage()
 	default:
+
+		if *helpFlag || *helpLongFlag {
+			printUsage()
+			return
+		}
+
 		fmt.Printf("Unknown subcommand: %s\n", os.Args[1])
 		printUsage()
 	}
 }
 
 func printUsage() {
+	var command string = os.Args[0]
 	fmt.Println("Usage:")
-	fmt.Println("  myprogram server")
-	fmt.Println("  myprogram client")
-	fmt.Println("  myprogram version")
-	fmt.Println("  myprogram help")
+	fmt.Printf("\t%s server\n", command)
+	fmt.Printf("\t%s client\n", command)
+	fmt.Printf("\t%s version\n", command)
+	fmt.Printf("\t%s help\n", command)
 	fmt.Println("\nFlags:")
 	fmt.Println("  -V, --version     Print version")
 	fmt.Println("  -h, --help        Print help")

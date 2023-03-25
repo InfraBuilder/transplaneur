@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -315,55 +316,82 @@ func (ts *TransplaneurServer) natStop() error {
 	return nil
 }
 
+func getenvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
+func getenvOrDefaultInt(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		parsedValue, err := strconv.Atoi(value)
+		if err == nil {
+			return parsedValue
+		}
+	}
+	return defaultValue
+}
+
+func printUsage(subcommandFlagSet *flag.FlagSet) {
+	fmt.Printf("Usage: %s %s [flags]\n", os.Args[0], os.Args[1])
+	fmt.Println("\nMandatory flags/environment variables:")
+	subcommandFlagSet.VisitAll(func(f *flag.Flag) {
+		if f.Name == "private-key" || f.Name == "endpoint" {
+			fmt.Printf("\t-%s\n\t\t %s=<%s>\n", f.Name, f.Usage, f.Name)
+		}
+	})
+
+	fmt.Println("\nOptional flags/environment variables:")
+	subcommandFlagSet.VisitAll(func(f *flag.Flag) {
+		if f.Name != "private-key" && f.Name != "endpoint" && f.Name != "h" && f.Name != "help" {
+			fmt.Printf("\t-%s=%s\n\t\t%s\n", f.Name, f.DefValue, f.Usage)
+		}
+	})
+
+	fmt.Println("\nHelp flags:")
+	fmt.Println("  -h, -help: Print help")
+}
+
 func Start() {
 
 	//====/ Configuration \=============================================
 
-	// Mandatory environment variables
-	privateKey := os.Getenv("WG_PRIVATE_KEY")
-	if privateKey == "" {
+	subcommandFlagSet := flag.NewFlagSet("server", flag.ExitOnError)
+
+	// Mandatory flags/environment variables
+	privateKey := subcommandFlagSet.String("private-key", os.Getenv("WG_PRIVATE_KEY"), "WireGuard private key (WG_PRIVATE_KEY)")
+	wgServerEndpoint := subcommandFlagSet.String("endpoint", os.Getenv("WG_ENDPOINT"), "WireGuard server endpoint, ex: '<ip/hostname>:<port>' (WG_ENDPOINT)")
+
+	// Optional flags/environment variables
+	cidr := subcommandFlagSet.String("cidr", getenvOrDefault("CIDR", "10.242.0.0/16"), "CIDR")
+	filePath := subcommandFlagSet.String("file-path", getenvOrDefault("FILE_PATH", "/data/ipam.json"), "File path to store IPAM persistence (FILE_PATH))")
+	wgInterfaceName := subcommandFlagSet.String("interface-name", getenvOrDefault("WG_INTERFACE_NAME", "wg0"), "WireGuard interface name (WG_INTERFACE_NAME)")
+	httpPort := subcommandFlagSet.String("http-port", getenvOrDefault("HTTP_LISTEN_PORT", "8080"), "HTTP listen port (HTTP_LISTEN_PORT)")
+	wgPort := subcommandFlagSet.Int("wg-port", getenvOrDefaultInt("WG_LISTEN_PORT", 51820), "WireGuard listen port (WG_LISTEN_PORT)")
+
+	helpFlag := subcommandFlagSet.Bool("h", false, "Print help")
+	helpLongFlag := subcommandFlagSet.Bool("help", false, "Print help")
+
+	subcommandFlagSet.Parse(os.Args[2:])
+
+	if *helpFlag || *helpLongFlag {
+		printUsage(subcommandFlagSet)
+		return
+	}
+
+	// Check mandatory variables/flags
+	if *privateKey == "" {
 		log.Fatal("WG_PRIVATE_KEY is not set")
 	}
 
-	wgServerEndpoint := os.Getenv("WG_ENDPOINT")
-	if privateKey == "" {
+	if *wgServerEndpoint == "" {
 		log.Fatal("WG_ENDPOINT is not set")
-	}
-
-	// Optional environment variables
-	cidr := "10.242.0.0/16"
-	if os.Getenv("CIDR") != "" {
-		cidr = os.Getenv("CIDR")
-	}
-
-	filePath := "/data/ipam.json"
-	if os.Getenv("FILE_PATH") != "" {
-		filePath = os.Getenv("FILE_PATH")
-	}
-
-	wgInterfaceName := "wg0"
-	if os.Getenv("WG_INTERFACE_NAME") != "" {
-		wgInterfaceName = os.Getenv("WG_INTERFACE_NAME")
-	}
-
-	httpPort := "8080"
-	if os.Getenv("HTTP_LISTEN_PORT") != "" {
-		httpPort = os.Getenv("HTTP_LISTEN_PORT")
-	}
-
-	wgPort := 51820
-	if os.Getenv("WG_LISTEN_PORT") != "" {
-		parsedWgPort, err := strconv.Atoi(os.Getenv("WG_LISTEN_PORT"))
-		if err != nil {
-			log.Fatal(err)
-		} else {
-			wgPort = parsedWgPort
-		}
 	}
 
 	//====/ Transplaneur \==============================================
 
-	transplaneurServer, err := NewTransplaneurServer(wgInterfaceName, privateKey, wgPort, cidr, filePath, wgServerEndpoint)
+	transplaneurServer, err := NewTransplaneurServer(*wgInterfaceName, *privateKey, *wgPort, *cidr, *filePath, *wgServerEndpoint)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -427,6 +455,6 @@ func Start() {
 	}).Methods("POST")
 
 	// Start API server
-	log.Printf("Starting server on port %s...\n", httpPort)
-	log.Fatal(http.ListenAndServe(":"+httpPort, api))
+	log.Printf("Starting server on port %s...\n", *httpPort)
+	log.Fatal(http.ListenAndServe(":"+*httpPort, api))
 }

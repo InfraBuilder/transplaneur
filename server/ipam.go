@@ -20,12 +20,20 @@ func (ipam *IPAM) String() string {
 	return fmt.Sprintf("IPAM(%s) : availableIPs=%d : allocatedIPs=%d", ipam.cidr, len(ipam.availableIPs), len(ipam.allocatedIPs))
 }
 
+func persistIPAM(ipam *IPAM) error {
+	data, err := json.MarshalIndent(ipam.allocatedIPs, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+	err = ioutil.WriteFile(ipam.filePath, data, 0644)
+	return err
+}
+
 func (ipam *IPAM) Register(publicKey string) (string, error) {
 	ipam.mu.Lock()
 	defer ipam.mu.Unlock()
 
 	if ip, ok := ipam.allocatedIPs[publicKey]; ok {
-		fmt.Println("pubkey=" + publicKey + " : IP already allocated : " + ip)
 		return ip, nil
 	}
 
@@ -37,10 +45,27 @@ func (ipam *IPAM) Register(publicKey string) (string, error) {
 	ipam.availableIPs = ipam.availableIPs[1:]
 	ipam.allocatedIPs[publicKey] = ip.String()
 
-	data, _ := json.MarshalIndent(ipam.allocatedIPs, "", "  ")
-	ioutil.WriteFile(ipam.filePath, data, 0644)
+	if persistIPAM(ipam) != nil {
+		return "", fmt.Errorf("failed to persist IPAM")
+	}
 
 	return ip.String(), nil
+}
+
+func (ipam *IPAM) Unregister(publicKey string) error {
+	ipam.mu.Lock()
+	defer ipam.mu.Unlock()
+
+	if ip, ok := ipam.allocatedIPs[publicKey]; ok {
+		delete(ipam.allocatedIPs, publicKey)
+		ipam.availableIPs = append(ipam.availableIPs, net.ParseIP(ip))
+		if persistIPAM(ipam) != nil {
+			return fmt.Errorf("failed to persist IPAM")
+		}
+		return nil
+	}
+
+	return fmt.Errorf("public key not found")
 }
 
 func NextIP(ip net.IP) net.IP {

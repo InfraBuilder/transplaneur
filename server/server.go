@@ -22,6 +22,8 @@ import (
 	wgctrl "golang.zx2c4.com/wireguard/wgctrl"
 	wgtypes "golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"github.com/gorilla/mux"
 )
 
@@ -67,11 +69,13 @@ func NewTransplaneurServer(wgDeviceName string, privateKey string, listenPort in
 	var availableIPs []net.IP
 	for ip := NextIP(gatewayIp); ipnet.Contains(ip); ip = NextIP(ip) {
 		if !ipnet.Contains(NextIP(ip)) {
-			fmt.Println("IP is the broadcast address: " + ip.String())
+			//fmt.Println("IP is the broadcast address: " + ip.String())
+			continue
 		} else if !allocatedIPsMap[ip.String()] && ipnet.Contains(NextIP(ip)) {
 			availableIPs = append(availableIPs, ip)
 		} else {
-			fmt.Println("IP already allocated: " + ip.String())
+			//fmt.Println("IP already allocated: " + ip.String())
+			continue
 		}
 	}
 
@@ -161,6 +165,37 @@ func (ts *TransplaneurServer) RegisterClient(pubkey string) (string, error) {
 
 	// Return the allocated IP address
 	return allocatedIp, nil
+}
+
+func (ts *TransplaneurServer) UnregisterClient(pubkey string) error {
+
+	removeWireguardPeerFromMetrics(ts, pubkey)
+
+	// Remove the IP address
+	err := ts.ipam.Unregister(pubkey)
+	if err != nil {
+		return err
+	}
+
+	// Create peer configuration
+	wgPublicKey, err := wgtypes.ParseKey(pubkey)
+	if err != nil {
+		return fmt.Errorf("Failed to parse public key: %v", err)
+	}
+
+	peer := wgtypes.PeerConfig{
+		PublicKey: wgPublicKey,
+		Remove:    true,
+	}
+
+	// Configure the WireGuard interface
+	if err := ts.wgClient.ConfigureDevice(ts.wgDeviceName, wgtypes.Config{
+		Peers: []wgtypes.PeerConfig{peer},
+	}); err != nil {
+		return fmt.Errorf("failed to configure device: %v for peer %s", err, pubkey)
+	}
+
+	return nil
 }
 
 func (ts *TransplaneurServer) Initiate() error {
@@ -407,6 +442,17 @@ func Start() {
 		log.Fatal(err)
 	}
 
+	//====/ Metrics \===================================================
+
+	initMetrics()
+
+	go func() {
+		for {
+			updateWireGuardMetrics(transplaneurServer)
+			time.Sleep(30 * time.Second)
+		}
+	}()
+
 	//====/ Signal handling \============================================
 
 	// Create a channel to receive the signals
@@ -434,18 +480,6 @@ func Start() {
 	// Create API server
 	api := mux.NewRouter()
 
-	// Check bearer as middleware
-	api.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			token := r.Header.Get("Authorization")
-			if token != "Bearer "+*bearerToken {
-				http.Error(w, "unauthorized", http.StatusUnauthorized)
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
-	})
-
 	// Log requests as middleware
 	api.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -456,8 +490,29 @@ func Start() {
 
 	// Endpoint to register a new peer
 	api.HandleFunc("/register", func(w http.ResponseWriter, r *http.Request) {
+		if checkBearer(w, r, *bearerToken) != nil {
+			return
+		}
 		httpPostRegister(transplaneurServer, w, r)
 	}).Methods("POST")
+
+	// Endpoint to unregister an existing peer
+	api.HandleFunc("/unregister", func(w http.ResponseWriter, r *http.Request) {
+		if checkBearer(w, r, *bearerToken) != nil {
+			return
+		}
+		httpPostUnregister(transplaneurServer, w, r)
+	}).Methods("POST")
+
+	// Endpoint to expose metrics
+	api.Handle("/metrics", promhttp.Handler()).Methods("GET")
+
+	// Endpoint to expose health
+	api.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		// Expose health
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "ok")
+	}).Methods("GET")
 
 	// Start API server
 	log.Printf("Starting server on port %s...\n", *httpPort)

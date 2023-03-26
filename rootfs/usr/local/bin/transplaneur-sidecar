@@ -1,5 +1,6 @@
 #!/bin/bash
 
+export GATEWAY_ID=${GATEWAY_ID:-default}
 
 # Default period to wait for gateway to be available
 export NETWORKS_TO_ROUTE="${NETWORKS_TO_ROUTE:-default}"
@@ -12,6 +13,7 @@ export WAIT_GATEWAY_PERIOD=${WAIT_GATEWAY_PERIOD:-5}
 
 export TRANSPLANEUR_RUN_DIR=/var/run/transplaneur
 export TRANSPLANEUR_LIB_DIR=/var/lib/transplaneur
+export GATEWAY_RUN_DIR=${TRANSPLANEUR_RUN_DIR}/${GATEWAY_ID}
 
 #===/ Utility functions \======================================================
 
@@ -108,22 +110,22 @@ CURRENT_GATEWAY=""
 while true; do
 
     # Wait for the gateway to be available
-    while [ ! -r ${TRANSPLANEUR_RUN_DIR}/local-gateway ]; do
-        warn "Waiting for gateway to be available ..."
+    while [ ! -r ${GATEWAY_RUN_DIR}/local-gateway ]; do
+        warn "Waiting for gateway $GATEWAY_ID to be available ..."
         sleep ${WAIT_GATEWAY_PERIOD}
     done
 
     # If the gateway has changed, update the routing table
     debug "Check if gateway has changed from current : $CURRENT_GATEWAY"
-    if [ "$CURRENT_GATEWAY" != "$(cat ${TRANSPLANEUR_RUN_DIR}/local-gateway)" ]; then
+    if [ "$CURRENT_GATEWAY" != "$(cat ${GATEWAY_RUN_DIR}/local-gateway)" ]; then
         PREVIOUS_GATEWAY=$CURRENT_GATEWAY
         
-        CURRENT_GATEWAY=$(cat ${TRANSPLANEUR_RUN_DIR}/local-gateway)
+        CURRENT_GATEWAY=$(cat ${GATEWAY_RUN_DIR}/local-gateway)
         
-        CLUSTER_POD_CIDR=$(cat ${TRANSPLANEUR_RUN_DIR}/cluster-pod-cidr)
-        CLUSTER_SERVICE_CIDR=$(cat ${TRANSPLANEUR_RUN_DIR}/cluster-svc-cidr)
+        CLUSTER_POD_CIDR=$(cat ${GATEWAY_RUN_DIR}/cluster-pod-cidr)
+        CLUSTER_SERVICE_CIDR=$(cat ${GATEWAY_RUN_DIR}/cluster-svc-cidr)
 
-        info "Gateway changed from $PREVIOUS_GATEWAY to $CURRENT_GATEWAY"
+        info "Gateway $GATEWAY_ID changed from $PREVIOUS_GATEWAY to $CURRENT_GATEWAY"
         changeGateway $CURRENT_GATEWAY
     fi
 

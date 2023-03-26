@@ -35,6 +35,7 @@ const (
 )
 
 type TransplaneurGatewayConfig struct {
+	GatewayId      string
 	WgDeviceName   string
 	PrivateKey     string
 	ApiEndpoint    string
@@ -44,6 +45,7 @@ type TransplaneurGatewayConfig struct {
 }
 
 type TransplaneurGateway struct {
+	gatewayId        string
 	wgClient         *wgctrl.Client
 	wgDeviceName     string
 	wgLink           *netlink.GenericLink
@@ -127,6 +129,7 @@ func NewTransplaneurGateway(config TransplaneurGatewayConfig) (*TransplaneurGate
 	}
 
 	return &TransplaneurGateway{
+		gatewayId:        config.GatewayId,
 		wgDeviceName:     config.WgDeviceName,
 		wgClient:         wgClient,
 		wgLink:           &wgLink,
@@ -245,15 +248,22 @@ PersistentKeepalive = 25
 
 	/// local-gateway vpn-public-ip vpn-endpoint-ip cluster-pod-cidr cluster-svc-cidr
 	// create files on communication channel
-	err = os.MkdirAll(sidecarCommunicationDirectory, 0755)
+	err = os.MkdirAll(sidecarCommunicationDirectory+"/"+tg.gatewayId, 0755)
 	if err != nil {
 		return fmt.Errorf("failed to create transplaneur directory: %v", err)
 	}
 
 	// Write the config file to disk for sidecars
-	ioutil.WriteFile(sidecarCommunicationDirectory+"/local-gateway", []byte(localPodIp.String()), 0644)
-	ioutil.WriteFile(sidecarCommunicationDirectory+"/cluster-pod-cidr", []byte(tg.clusterPodCidr), 0644)
-	ioutil.WriteFile(sidecarCommunicationDirectory+"/cluster-svc-cidr", []byte(tg.clusterSvcCidr), 0644)
+	if ioutil.WriteFile(sidecarCommunicationDirectory+"/"+tg.gatewayId+"/local-gateway", []byte(localPodIp.String()), 0644) != nil {
+		return fmt.Errorf("failed to write local-gateway file")
+	}
+
+	if ioutil.WriteFile(sidecarCommunicationDirectory+"/"+tg.gatewayId+"/cluster-pod-cidr", []byte(tg.clusterPodCidr), 0644) != nil {
+		return fmt.Errorf("failed to write cluster-pod-cidr file")
+	}
+	if ioutil.WriteFile(sidecarCommunicationDirectory+"/"+tg.gatewayId+"/cluster-svc-cidr", []byte(tg.clusterSvcCidr), 0644) != nil {
+		return fmt.Errorf("failed to write cluster-svc-cidr file")
+	}
 
 	log.Println("WireGuard configured")
 
@@ -263,9 +273,9 @@ PersistentKeepalive = 25
 func (tg *TransplaneurGateway) Shutdown() error {
 
 	// Delete the config file for sidecars
-	os.Remove(sidecarCommunicationDirectory + "/local-gateway")
-	os.Remove(sidecarCommunicationDirectory + "/cluster-pod-cidr")
-	os.Remove(sidecarCommunicationDirectory + "/cluster-svc-cidr")
+	os.Remove(sidecarCommunicationDirectory + "/" + tg.gatewayId + "/local-gateway")
+	os.Remove(sidecarCommunicationDirectory + "/" + tg.gatewayId + "/cluster-pod-cidr")
+	os.Remove(sidecarCommunicationDirectory + "/" + tg.gatewayId + "/cluster-svc-cidr")
 
 	tg.natStop()
 	log.Println("NAT stopped")
@@ -371,6 +381,7 @@ func Start() {
 	// Optional flags/environment variables
 	wgInterfaceName := subcommandFlagSet.String("interface-name", getenvOrDefault("WG_INTERFACE_NAME", "wg0"), "WireGuard interface name (WG_INTERFACE_NAME)")
 	httpPort := subcommandFlagSet.String("http-port", getenvOrDefault("HTTP_LISTEN_PORT", "8080"), "HTTP listen port (HTTP_LISTEN_PORT)")
+	gatewayId := subcommandFlagSet.String("gateway-id", getenvOrDefault("GATEWAY_ID", "default"), "Identifier for this gateway (GATEWAY_ID)")
 
 	helpFlag := subcommandFlagSet.Bool("h", false, "Print help")
 	helpLongFlag := subcommandFlagSet.Bool("help", false, "Print help")
@@ -404,6 +415,7 @@ func Start() {
 	//====/ Transplaneur \==============================================
 
 	transplaneurGatewayConfig := TransplaneurGatewayConfig{
+		GatewayId:      *gatewayId,
 		WgDeviceName:   *wgInterfaceName,
 		PrivateKey:     *privateKey,
 		ApiEndpoint:    *apiEndpoint,

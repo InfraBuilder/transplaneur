@@ -107,23 +107,27 @@ func NewTransplaneurGateway(config TransplaneurGatewayConfig) (*TransplaneurGate
 		return nil, fmt.Errorf("failed to create transplaneur directory: %v", err)
 	}
 
+	privateKey := ""
 	// Read private key from file private_key
 	contentBytes, err := ioutil.ReadFile(sidecarCommunicationDirectory + "/" + config.GatewayId + "/private_key")
 	if err != nil {
+		log.Println("Failed to read private key from file, generating new one")
 		// Generate private key
 		wgPrivateKey, err := wgtypes.GeneratePrivateKey()
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate private key: %v", err)
 		}
 
+		privateKey = wgPrivateKey.String()
 		// Write private key to file private_key
-		err = ioutil.WriteFile(sidecarCommunicationDirectory+"/"+config.GatewayId+"/private_key", []byte(wgPrivateKey.String()), 0644)
+		err = ioutil.WriteFile(sidecarCommunicationDirectory+"/"+config.GatewayId+"/private_key", []byte(privateKey), 0644)
 		if err != nil {
 			return nil, fmt.Errorf("failed to write private key to file: %v", err)
 		}
+	} else {
+		log.Println("Reading private key from file")
+		privateKey = string(contentBytes)
 	}
-
-	privateKey := string(contentBytes)
 
 	// Parse private key
 	wgPrivateKey, err := wgtypes.ParseKey(privateKey)

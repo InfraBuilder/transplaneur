@@ -37,7 +37,6 @@ const (
 type TransplaneurGatewayConfig struct {
 	GatewayId      string
 	WgDeviceName   string
-	PrivateKey     string
 	ApiEndpoint    string
 	BearerToken    string
 	ClusterPodCidr string
@@ -102,8 +101,32 @@ func registerOnServer(apiEndpoint string, publicKey string, bearerToken string) 
 
 func NewTransplaneurGateway(config TransplaneurGatewayConfig) (*TransplaneurGateway, error) {
 
+	// create files on communication channel
+	err := os.MkdirAll(sidecarCommunicationDirectory+"/"+config.GatewayId, 0755)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transplaneur directory: %v", err)
+	}
+
+	// Read private key from file private_key
+	contentBytes, err := ioutil.ReadFile(sidecarCommunicationDirectory + "/" + config.GatewayId + "/private_key")
+	if err != nil {
+		// Generate private key
+		wgPrivateKey, err := wgtypes.GeneratePrivateKey()
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate private key: %v", err)
+		}
+
+		// Write private key to file private_key
+		err = ioutil.WriteFile(sidecarCommunicationDirectory+"/"+config.GatewayId+"/private_key", []byte(wgPrivateKey.String()), 0644)
+		if err != nil {
+			return nil, fmt.Errorf("failed to write private key to file: %v", err)
+		}
+	}
+
+	privateKey := string(contentBytes)
+
 	// Parse private key
-	wgPrivateKey, err := wgtypes.ParseKey(config.PrivateKey)
+	wgPrivateKey, err := wgtypes.ParseKey(privateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse private key: %v", err)
 	}
@@ -133,7 +156,7 @@ func NewTransplaneurGateway(config TransplaneurGatewayConfig) (*TransplaneurGate
 		wgDeviceName:     config.WgDeviceName,
 		wgClient:         wgClient,
 		wgLink:           &wgLink,
-		privateKey:       config.PrivateKey,
+		privateKey:       privateKey,
 		publicKey:        publicKey,
 		clientIp:         registerResponse.ClientIP,
 		gatewayIp:        registerResponse.GatewayIP,
@@ -244,13 +267,6 @@ PersistentKeepalive = 25
 	localPodIp, err := getPodLocalIP()
 	if err != nil {
 		return fmt.Errorf("failed to detect pod IP address: %v", err)
-	}
-
-	/// local-gateway vpn-public-ip vpn-endpoint-ip cluster-pod-cidr cluster-svc-cidr
-	// create files on communication channel
-	err = os.MkdirAll(sidecarCommunicationDirectory+"/"+tg.gatewayId, 0755)
-	if err != nil {
-		return fmt.Errorf("failed to create transplaneur directory: %v", err)
 	}
 
 	// Write the config file to disk for sidecars
@@ -372,7 +388,6 @@ func Start() {
 	subcommandFlagSet := flag.NewFlagSet("gateway", flag.ExitOnError)
 
 	// Mandatory flags/environment variables
-	privateKey := subcommandFlagSet.String("private-key", os.Getenv("WG_PRIVATE_KEY"), "WireGuard private key (WG_PRIVATE_KEY)")
 	apiEndpoint := subcommandFlagSet.String("apiEndpoint", os.Getenv("API_ENDPOINT"), "Transplaneur API endpoint, ex: '<ip/hostname>:<port>' (API_ENDPOINT)")
 	bearerToken := subcommandFlagSet.String("bearer-token", os.Getenv("BEARER_TOKEN"), "API bearer token (BEARER_TOKEN)")
 	clusterPodCidr := subcommandFlagSet.String("cluster-pod-cidr", os.Getenv("CLUSTER_POD_CIDR"), "Cluster CIDR for Pods (CLUSTER_POD_CIDR)")
@@ -394,10 +409,6 @@ func Start() {
 	}
 
 	// Check mandatory variables/flags
-	if *privateKey == "" {
-		log.Fatal("WG_PRIVATE_KEY is not set")
-	}
-
 	if *apiEndpoint == "" {
 		log.Fatal("API_ENDPOINT is not set")
 	}
@@ -417,7 +428,6 @@ func Start() {
 	transplaneurGatewayConfig := TransplaneurGatewayConfig{
 		GatewayId:      *gatewayId,
 		WgDeviceName:   *wgInterfaceName,
-		PrivateKey:     *privateKey,
 		ApiEndpoint:    *apiEndpoint,
 		BearerToken:    *bearerToken,
 		ClusterPodCidr: *clusterPodCidr,

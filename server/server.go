@@ -373,7 +373,7 @@ func printUsage(subcommandFlagSet *flag.FlagSet) {
 	fmt.Println("\nMandatory flags/environment variables:")
 	subcommandFlagSet.VisitAll(func(f *flag.Flag) {
 		if f.Name == "private-key" || f.Name == "endpoint" || f.Name == "bearer-token" {
-			fmt.Printf("\t-%s\n\t\t %s=<%s>\n", f.Name, f.Usage, f.Name)
+			fmt.Printf("\t-%s=<%s>\n\t\t %s\n", f.Name, f.Name, f.Usage)
 		}
 	})
 

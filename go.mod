@@ -6,6 +6,7 @@ require github.com/gorilla/mux v1.8.0
 
 require (
 	github.com/coreos/go-iptables v0.6.0
+	github.com/go-ping/ping v1.1.0
 	github.com/prometheus/client_golang v1.14.0
 	github.com/vishvananda/netlink v1.1.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20230215201556-9c5414ab4bde
@@ -16,6 +17,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
+	github.com/google/uuid v1.2.0 // indirect
 	github.com/josharian/native v1.0.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/mdlayher/genetlink v1.2.0 // indirect

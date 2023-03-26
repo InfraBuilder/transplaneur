@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	gateway "github.com/infrabuilder/transplaneur/gateway"
 	server "github.com/infrabuilder/transplaneur/server"
 )
 
@@ -42,8 +43,10 @@ func main() {
 	switch os.Args[1] {
 	case "server":
 		server.Start()
-	case "client":
-		// Implement client subcommand
+	case "gateway":
+		gateway.Start()
+	case "sidecar":
+		// Implement sidecar subcommand
 	case "version":
 		printVersion()
 	case "help":
@@ -64,7 +67,8 @@ func printUsage() {
 	var command string = os.Args[0]
 	fmt.Println("Usage:")
 	fmt.Printf("\t%s server\n", command)
-	fmt.Printf("\t%s client\n", command)
+	fmt.Printf("\t%s gateway\n", command)
+	fmt.Printf("\t%s sidecar\n", command)
 	fmt.Printf("\t%s version\n", command)
 	fmt.Printf("\t%s help\n", command)
 	fmt.Println("\nFlags:")

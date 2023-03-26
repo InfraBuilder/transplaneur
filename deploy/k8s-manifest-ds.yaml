@@ -22,23 +22,32 @@ spec:
         image: infrabuilder/transplaneur:edge
         imagePullPolicy: Always
         command: 
-        - transplaneur-gateway
-        resources: {}
-          # limits:
-          #   cpu: 50m
-          #   memory: 64Mi
-          # requests:
-          #   cpu: 50m
-          #   memory: 64Mi
+        - transplaneur
+        - gateway
+        resources:
+          limits:
+            cpu: 50m
+            memory: 128Mi
+          requests:
+            cpu: 50m
+            memory: 128Mi
         securityContext:
           privileged: true
           runAsNonRoot: false
           runAsUser: 0
         env:
+        - name: WG_PRIVATE_KEY
+          value: "<REDACTED>"          # <=== This is the value that needs to be set
+        - name: "API_ENDPOINT"
+          value: "https://<hostname>"  # <=== This is the value that needs to be set
+        - name: "BEARER_TOKEN"
+          value: "<REDACTED>"          # <=== This is the value that needs to be set
         - name: CLUSTER_POD_CIDR
-          value: ""   # <=== This is the value that needs to be set
+          value: ""                    # <=== This is the value that needs to be set
         - name: CLUSTER_SVC_CIDR
-          value: ""     # <=== This is the value that needs to be set
+          value: ""                    # <=== This is the value that needs to be set
+
+        # Following env vars are set by k8s
         - name: MY_NODE_NAME
           valueFrom:
             fieldRef:
@@ -56,11 +65,11 @@ spec:
             fieldRef:
               fieldPath: status.podIP
         readinessProbe:
-          exec:
-            command:
-            - /usr/local/bin/transplaneur-healthcheck-gw
-          initialDelaySeconds: 3
-          periodSeconds: 1
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
         volumeMounts:
         - name: run
           mountPath: /var/run/transplaneur

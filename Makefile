@@ -1,4 +1,4 @@
-.PHONY: bump-major bump-minor bump-patch docker-build docker-run-server help
+.PHONY: bump-major bump-minor bump-patch docker-build docker-run-server docker-run-gateway help
 
 # Get the latest git tag and its version components
 CURRENT_VERSION=$(shell git describe --tags --abbrev=0)
@@ -36,7 +36,7 @@ docker-build:
 
 # Run the app locally, NEVER USER THIS IN PRODUCTION !
 docker-run-server:
-	@echo "Building local version of the app"
+	@echo "Running local version of transplaneur server"
 	docker run -it --rm --privileged \
 		-v ${PWD}/WIP/:/data \
 		-p 8080:8080 -p 51820:51820/udp \
@@ -47,6 +47,20 @@ docker-run-server:
 		infrabuilder/transplaneur:dev \
 		time -v transplaneur server
 
+# Run the app locally, NEVER USER THIS IN PRODUCTION !
+docker-run-gateway:
+	@echo "Running local version of transplaneur gateway"
+	docker run -it --rm --privileged \
+		-v ${PWD}/WIP/:/var/run/transplaneur \
+		-e BEARER_TOKEN=localdev \
+		-e "WG_PRIVATE_KEY=aFD6WJ09gBm3mZmyToKGcIBvg6fsQStFspoFHW9eY0Q=" \
+		-e "API_ENDPOINT=http://172.17.0.1:8080" \
+		-e "CLUSTER_POD_CIDR=10.42.0.0/16" \
+		-e "CLUSTER_SVC_CIDR=10.43.0.0/16" \
+		--name transplaneur-gateway \
+		infrabuilder/transplaneur:dev \
+		time -v transplaneur gateway
+
 help:
 	@echo "Usage: make [target]"
 	@echo ""
@@ -55,5 +69,6 @@ help:
 	@echo "  bump-minor: Bump the minor version"
 	@echo "  bump-patch: Bump the patch version"
 	@echo "  docker-build: Build the docker image"
-	@echo "  docker-run-server: Run the app locally with docker"
+	@echo "  docker-run-server: Run the server locally with docker"
+	@echo "  docker-run-gateway: Run the gateway locally with docker"
 	@echo "  help: Show this help"

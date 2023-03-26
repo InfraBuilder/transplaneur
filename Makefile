@@ -1,4 +1,4 @@
-.PHONY: bump-major bump-minor bump-patch docker-build docker-run-server docker-run-gateway help
+.PHONY: bump-major bump-minor bump-patch git-push docker-build docker-run-server docker-run-gateway help
 
 # Get the latest git tag and its version components
 CURRENT_VERSION=$(shell git describe --tags --abbrev=0)
@@ -28,6 +28,8 @@ bump-patch:
 	@echo To push this tag execute : 
 	@echo git push origin $(MAJOR).$(MINOR).$(NEW_PATCH)
 
+git-push:
+	git push && git push --tags
 
 # Docker
 docker-build:

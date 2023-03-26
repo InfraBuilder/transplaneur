@@ -36,8 +36,6 @@ spec:
           runAsNonRoot: false
           runAsUser: 0
         env:
-        - name: WG_PRIVATE_KEY
-          value: "<REDACTED>"          # <=== This is the value that needs to be set
         - name: "API_ENDPOINT"
           value: "https://<hostname>"  # <=== This is the value that needs to be set
         - name: "BEARER_TOKEN"

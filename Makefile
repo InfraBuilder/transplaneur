@@ -1,4 +1,4 @@
-.PHONY: bump-major bump-minor bump-patch git-push docker-build docker-run-server docker-run-gateway help
+.PHONY: bump-major bump-minor bump-patch git-push docker-build docker-run-server docker-run-gateway docker-run-sidecar help
 
 # Get the latest git tag and its version components
 CURRENT_VERSION=$(shell git describe --tags --abbrev=0)
@@ -62,6 +62,16 @@ docker-run-gateway:
 		--name transplaneur-gateway \
 		infrabuilder/transplaneur:dev \
 		time -v transplaneur gateway
+
+
+# Run the app locally, NEVER USER THIS IN PRODUCTION !
+docker-run-sidecar:
+	@echo "Running local version of transplaneur gateway"
+	docker run -it --rm --privileged \
+		-v ${PWD}/WIP/:/var/run/transplaneur \
+		--name transplaneur-sidecar \
+		infrabuilder/transplaneur:dev \
+		time -v transplaneur sidecar
 
 help:
 	@echo "Usage: make [target]"

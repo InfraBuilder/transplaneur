@@ -8,6 +8,7 @@ import (
 
 	gateway "github.com/infrabuilder/transplaneur/gateway"
 	server "github.com/infrabuilder/transplaneur/server"
+	sidecar "github.com/infrabuilder/transplaneur/sidecar"
 )
 
 var version string
@@ -46,7 +47,7 @@ func main() {
 	case "gateway":
 		gateway.Start()
 	case "sidecar":
-		// Implement sidecar subcommand
+		sidecar.Start()
 	case "version":
 		printVersion()
 	case "help":

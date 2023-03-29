@@ -7,7 +7,8 @@ spec:
   # ...
   - name: transplaneur-sidecar
     command:
-    - transplaneur-sidecar
+    - transplaneur
+    - sidecar
     image: infrabuilder/transplaneur:edge
     imagePullPolicy: Always
     resources:

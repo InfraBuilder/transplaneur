@@ -242,12 +242,11 @@ func (tg *TransplaneurGateway) Initiate() error {
 	}
 	log.Println("NAT started")
 
+	wgConfOpt := ""
+
 	// Set interface MTU
 	if tg.wgMtu > 0 {
-		err := netlink.LinkSetMTU(tg.wgLink, tg.wgMtu)
-		if err != nil {
-			return fmt.Errorf("Error setting MTU: %v\n", err)
-		}
+		wgConfOpt = fmt.Sprintf("MTU = %d\n", tg.wgMtu)
 		log.Println("MTU manually set to", tg.wgMtu, "bytes")
 	} else {
 		log.Println("MTU not manually set, using default")
@@ -265,7 +264,8 @@ PublicKey = %s
 AllowedIPs = 0.0.0.0/0, %s/32
 Endpoint = %s
 PersistentKeepalive = 25
-`, tg.privateKey, tg.clientIp, tg.gatewayPublicKey, tg.gatewayIp, tg.endpoint)
+%s
+`, tg.privateKey, tg.clientIp, tg.gatewayPublicKey, tg.gatewayIp, tg.endpoint, wgConfOpt)
 
 	// Write the config file to disk
 	fileName := fmt.Sprintf("/etc/wireguard/%s.conf", tg.wgDeviceName)

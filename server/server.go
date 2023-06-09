@@ -35,11 +35,12 @@ type TransplaneurServer struct {
 	privateKey   string
 	publicKey    string
 	listenPort   int
+	mtu          int
 	gatewayIp    string
 	endpoint     string
 }
 
-func NewTransplaneurServer(wgDeviceName string, privateKey string, listenPort int, cidr string, filePath string, endpoint string) (*TransplaneurServer, error) {
+func NewTransplaneurServer(wgDeviceName string, privateKey string, listenPort int, mtu int, cidr string, filePath string, endpoint string) (*TransplaneurServer, error) {
 
 	// === 1) Create the IPAM and set server IP ============================
 
@@ -114,6 +115,7 @@ func NewTransplaneurServer(wgDeviceName string, privateKey string, listenPort in
 		privateKey:   privateKey,
 		publicKey:    wgPrivateKey.PublicKey().String(),
 		listenPort:   listenPort,
+		mtu:          mtu,
 		wgClient:     wgClient,
 		gatewayIp:    gatewayIp.String(),
 		endpoint:     endpoint,
@@ -247,6 +249,17 @@ func (ts *TransplaneurServer) Initiate() error {
 	err = netlink.LinkAdd(ts.wgLink)
 	if err != nil {
 		return fmt.Errorf("Error creating WireGuard interface: %v\n", err)
+	}
+
+	// Set interface MTU
+	if ts.mtu > 0 {
+		err = netlink.LinkSetMTU(ts.wgLink, ts.mtu)
+		if err != nil {
+			return fmt.Errorf("Error setting MTU: %v\n", err)
+		}
+		log.Println("MTU manually set to", ts.mtu, "bytes")
+	} else {
+		log.Println("MTU not manually set, using default")
 	}
 
 	// Start the interface
@@ -405,6 +418,7 @@ func Start() {
 	wgInterfaceName := subcommandFlagSet.String("interface-name", getenvOrDefault("WG_INTERFACE_NAME", "wg0"), "WireGuard interface name (WG_INTERFACE_NAME)")
 	httpPort := subcommandFlagSet.String("http-port", getenvOrDefault("HTTP_LISTEN_PORT", "8080"), "HTTP listen port (HTTP_LISTEN_PORT)")
 	wgPort := subcommandFlagSet.Int("wg-port", getenvOrDefaultInt("WG_LISTEN_PORT", 51820), "WireGuard listen port (WG_LISTEN_PORT)")
+	wgMtu := subcommandFlagSet.Int("wg-mtu", getenvOrDefaultInt("WG_MTU", 0), "WireGuard listen port, 0 for auto (WG_MTU)")
 
 	helpFlag := subcommandFlagSet.Bool("h", false, "Print help")
 	helpLongFlag := subcommandFlagSet.Bool("help", false, "Print help")
@@ -431,7 +445,7 @@ func Start() {
 
 	//====/ Transplaneur \==============================================
 
-	transplaneurServer, err := NewTransplaneurServer(*wgInterfaceName, *privateKey, *wgPort, *cidr, *filePath, *wgServerEndpoint)
+	transplaneurServer, err := NewTransplaneurServer(*wgInterfaceName, *privateKey, *wgPort, *wgMtu, *cidr, *filePath, *wgServerEndpoint)
 	if err != nil {
 		log.Fatal(err)
 	}

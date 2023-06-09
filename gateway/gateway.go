@@ -289,9 +289,21 @@ PersistentKeepalive = 25
 		return fmt.Errorf("failed to detect pod IP address: %v", err)
 	}
 
+	// Retrieve wgLink MTU
+	wgLink, err := netlink.LinkByName(tg.wgDeviceName)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve wgLink: %v", err)
+	}
+	wgLinkMTU := wgLink.Attrs().MTU
+	wgLinkMTUString := strconv.Itoa(wgLinkMTU)
+
 	// Write the config file to disk for sidecars
 	if ioutil.WriteFile(sidecarCommunicationDirectory+"/"+tg.gatewayId+"/local-gateway", []byte(localPodIp.String()), 0644) != nil {
 		return fmt.Errorf("failed to write local-gateway file")
+	}
+
+	if ioutil.WriteFile(sidecarCommunicationDirectory+"/"+tg.gatewayId+"/mtu", []byte(wgLinkMTUString), 0644) != nil {
+		return fmt.Errorf("failed to write mtu file")
 	}
 
 	if ioutil.WriteFile(sidecarCommunicationDirectory+"/"+tg.gatewayId+"/cluster-pod-cidr", []byte(tg.clusterPodCidr), 0644) != nil {
@@ -310,6 +322,7 @@ func (tg *TransplaneurGateway) Shutdown() error {
 
 	// Delete the config file for sidecars
 	os.Remove(sidecarCommunicationDirectory + "/" + tg.gatewayId + "/local-gateway")
+	os.Remove(sidecarCommunicationDirectory + "/" + tg.gatewayId + "/mtu")
 	os.Remove(sidecarCommunicationDirectory + "/" + tg.gatewayId + "/cluster-pod-cidr")
 	os.Remove(sidecarCommunicationDirectory + "/" + tg.gatewayId + "/cluster-svc-cidr")
 

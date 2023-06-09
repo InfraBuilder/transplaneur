@@ -6,6 +6,18 @@ MAJOR=$(shell echo $(CURRENT_VERSION) | cut -d. -f1)
 MINOR=$(shell echo $(CURRENT_VERSION) | cut -d. -f2)
 PATCH=$(shell echo $(CURRENT_VERSION) | cut -d. -f3)
 
+help:
+	@echo "Usage: make [target]"
+	@echo ""
+	@echo "Targets:"
+	@echo "  bump-major: Bump the major version"
+	@echo "  bump-minor: Bump the minor version"
+	@echo "  bump-patch: Bump the patch version"
+	@echo "  docker-build: Build the docker image"
+	@echo "  docker-run-server: Run the server locally with docker"
+	@echo "  docker-run-gateway: Run the gateway locally with docker"
+	@echo "  help: Show this help"
+
 # Version bumping
 bump-major:
 	$(eval NEW_MAJOR=$(shell echo $$(( $(MAJOR) + 1 )) ))
@@ -72,15 +84,3 @@ docker-run-sidecar:
 		--name transplaneur-sidecar \
 		infrabuilder/transplaneur:dev \
 		time -v transplaneur sidecar
-
-help:
-	@echo "Usage: make [target]"
-	@echo ""
-	@echo "Targets:"
-	@echo "  bump-major: Bump the major version"
-	@echo "  bump-minor: Bump the minor version"
-	@echo "  bump-patch: Bump the patch version"
-	@echo "  docker-build: Build the docker image"
-	@echo "  docker-run-server: Run the server locally with docker"
-	@echo "  docker-run-gateway: Run the gateway locally with docker"
-	@echo "  help: Show this help"

@@ -302,7 +302,7 @@ PersistentKeepalive = 25
 		return fmt.Errorf("failed to write local-gateway file")
 	}
 
-	if ioutil.WriteFile(sidecarCommunicationDirectory+"/"+tg.gatewayId+"/mtu", []byte(wgLinkMTUString), 0644) != nil {
+	if ioutil.WriteFile(sidecarCommunicationDirectory+"/"+tg.gatewayId+"/gateway-mtu", []byte(wgLinkMTUString), 0644) != nil {
 		return fmt.Errorf("failed to write mtu file")
 	}
 
@@ -322,7 +322,7 @@ func (tg *TransplaneurGateway) Shutdown() error {
 
 	// Delete the config file for sidecars
 	os.Remove(sidecarCommunicationDirectory + "/" + tg.gatewayId + "/local-gateway")
-	os.Remove(sidecarCommunicationDirectory + "/" + tg.gatewayId + "/mtu")
+	os.Remove(sidecarCommunicationDirectory + "/" + tg.gatewayId + "/gateway-mtu")
 	os.Remove(sidecarCommunicationDirectory + "/" + tg.gatewayId + "/cluster-pod-cidr")
 	os.Remove(sidecarCommunicationDirectory + "/" + tg.gatewayId + "/cluster-svc-cidr")
 

@@ -80,7 +80,7 @@ func (ts *TransplaneurSidecar) Initiate() error {
 	return nil
 }
 
-func ensureRouteIsCorrect(dst string, gw string, device string) error {
+func ensureRouteIsCorrect(dst string, gw string, device string, customMtu string) error {
 
 	cmd := exec.Command("ip", "route", "show", dst)
 	cmdOutputBytes, err := cmd.Output()
@@ -88,7 +88,12 @@ func ensureRouteIsCorrect(dst string, gw string, device string) error {
 		return fmt.Errorf("Error while running ip route command: %v", err)
 	}
 
-	expectedRoute := fmt.Sprintf("%s via %s dev %s", dst, gw, device)
+	expectedRoute := ""
+	if customMtu != "" {
+		expectedRoute = fmt.Sprintf("%s via %s dev %s mtu %s", dst, gw, device, customMtu)
+	} else {
+		expectedRoute = fmt.Sprintf("%s via %s dev %s", dst, gw, device)
+	}
 	cmdOutput := string(cmdOutputBytes)
 
 	if err != nil {
@@ -103,8 +108,11 @@ func ensureRouteIsCorrect(dst string, gw string, device string) error {
 				log.Printf("Error while deleting route: %v", err)
 			}
 		}
-
-		cmd = exec.Command("ip", "route", "add", dst, "via", gw, "dev", device)
+		if customMtu != "" {
+			cmd = exec.Command("ip", "route", "add", dst, "via", gw, "dev", device, "mtu", customMtu)
+		} else {
+			cmd = exec.Command("ip", "route", "add", dst, "via", gw, "dev", device)
+		}
 		_, err = cmd.Output()
 		if err != nil {
 			log.Printf("Error while adding route: %v", err)
@@ -116,24 +124,24 @@ func ensureRouteIsCorrect(dst string, gw string, device string) error {
 	return nil
 }
 
-func (ts *TransplaneurSidecar) ChangeGateway(gatewayIp string, clusterPodCidr string, clusterSvcCidr string) error {
+func (ts *TransplaneurSidecar) ChangeGateway(gatewayIp string, gatewayMtu string, clusterPodCidr string, clusterSvcCidr string) error {
 
 	log.Println(fmt.Sprintf("Changing gateway from %s to %s", ts.currentGatewayIp, gatewayIp))
 
 	// Set route to Pod CIDR
-	err := ensureRouteIsCorrect(clusterPodCidr, ts.originalGateway, ts.defaultInterface)
+	err := ensureRouteIsCorrect(clusterPodCidr, ts.originalGateway, ts.defaultInterface, "")
 	if err != nil {
 		return fmt.Errorf("could not set route to clusterPodCidr: %v", err)
 	}
 
 	// Set route to Service CIDR
-	err = ensureRouteIsCorrect(clusterSvcCidr, ts.originalGateway, ts.defaultInterface)
+	err = ensureRouteIsCorrect(clusterSvcCidr, ts.originalGateway, ts.defaultInterface, "")
 	if err != nil {
 		return fmt.Errorf("could not set route to clusterSvcCidr: %v", err)
 	}
 
 	// Set default route to Gateway IP
-	err = ensureRouteIsCorrect("default", gatewayIp, ts.defaultInterface)
+	err = ensureRouteIsCorrect("default", gatewayIp, ts.defaultInterface, gatewayMtu)
 	if err != nil {
 		return fmt.Errorf("could not set default route to gatewayIp: %v", err)
 	}
@@ -180,7 +188,14 @@ func (ts *TransplaneurSidecar) CheckGatewayChange() error {
 		}
 		clusterSvcCidr := string(clusterSvcCidrBytes)
 
-		err = ts.ChangeGateway(gatewayIp, clusterPodCidr, clusterSvcCidr)
+		// Read clusterPodCidr from file
+		gatewayMtuBytes, err := os.ReadFile(fmt.Sprintf("%s/%s/gateway-mtu", sidecarCommunicationDirectory, ts.gatewayId))
+		if err != nil {
+			return fmt.Errorf("could not read gatewayMtu: %v", err)
+		}
+		gatewayMtu := string(gatewayMtuBytes)
+
+		err = ts.ChangeGateway(gatewayIp, gatewayMtu, clusterPodCidr, clusterSvcCidr)
 		if err != nil {
 			return fmt.Errorf("could not change gateway: %v", err)
 		}

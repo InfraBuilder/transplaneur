@@ -13,6 +13,7 @@ help:
 	@echo "  bump-major: Bump the major version"
 	@echo "  bump-minor: Bump the minor version"
 	@echo "  bump-patch: Bump the patch version"
+	@echo "  git-push: Push the current branch and tags"
 	@echo "  docker-build: Build the docker image"
 	@echo "  docker-run-server: Run the server locally with docker"
 	@echo "  docker-run-gateway: Run the gateway locally with docker"

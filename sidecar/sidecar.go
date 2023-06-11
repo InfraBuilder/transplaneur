@@ -190,15 +190,12 @@ func (ts *TransplaneurSidecar) CheckGatewayChange() error {
 
 		// Read optionnal mtu file to set custom MTU
 		gatewayMtu := ""
-		if _, err := os.Stat(fmt.Sprintf("%s/%s/gateway-mtu", sidecarCommunicationDirectory, ts.gatewayId)); err != nil {
-			gatewayMtuBytes, err := os.ReadFile(fmt.Sprintf("%s/%s/gateway-mtu", sidecarCommunicationDirectory, ts.gatewayId))
-			if err != nil {
-				return fmt.Errorf("could not read gatewayMtu: %v", err)
-			}
+		gatewayMtuBytes, err := os.ReadFile(fmt.Sprintf("%s/%s/gateway-mtu", sidecarCommunicationDirectory, ts.gatewayId))
+		if err == nil {
 			gatewayMtu = string(gatewayMtuBytes)
 			log.Printf("Using custom MTU: %s", gatewayMtu)
 		} else {
-			log.Printf("Using default MTU")
+			log.Printf(fmt.Sprintf("Cannot read %s/%s/gateway-mtu, Using default MTU", sidecarCommunicationDirectory, ts.gatewayId))
 		}
 
 		err = ts.ChangeGateway(gatewayIp, gatewayMtu, clusterPodCidr, clusterSvcCidr)

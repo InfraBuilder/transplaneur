@@ -197,8 +197,7 @@ func (ts *TransplaneurSidecar) CheckGatewayChange() error {
 			}
 			gatewayMtu = string(gatewayMtuBytes)
 			log.Printf("Using custom MTU: %s", gatewayMtu)
-		}
-		else {
+		} else {
 			log.Printf("Using default MTU")
 		}
 

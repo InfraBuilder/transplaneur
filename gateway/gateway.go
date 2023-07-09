@@ -190,6 +190,18 @@ func (tg *TransplaneurGateway) enableIPForwarding() error {
 	return nil
 }
 
+// set rp filter to loose mode
+func (tg *TransplaneurGateway) systemSetLooseRPF() error {
+	cmd := exec.Command("sysctl", "-w", "net.ipv4.conf.all.rp_filter=2")
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		return fmt.Errorf("failed to set loose RPF: %v\nOutput: %s", err, output)
+	}
+
+	return nil
+}
+
 func (tg *TransplaneurGateway) natStart() error {
 	ipt, err := iptables.New()
 	if err != nil {
@@ -237,6 +249,12 @@ func (tg *TransplaneurGateway) Initiate() error {
 		return fmt.Errorf("failed to enable IP forwarding")
 	}
 	log.Println("IP forwarding enabled")
+
+	if tg.systemSetLooseRPF() != nil {
+		return fmt.Errorf("failed to set loose RPF")
+	}
+	log.Println("Loose RPF set")
+
 	if tg.natStart() != nil {
 		return fmt.Errorf("failed to start NAT")
 	}
